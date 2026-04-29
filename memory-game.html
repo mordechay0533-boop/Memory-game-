@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>משחק זיכרון</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d1a;
+    --surface: #13132a;
+    --card-back: #1e1e3f;
+    --card-front: #252550;
+    --accent: #7c6aff;
+    --accent2: #ff6ab0;
+    --match: #2ecc71;
+    --text: #e8e8f5;
+    --muted: #7070a0;
+    --border: #2a2a5a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Heebo', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Stars background ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 60% 70%, rgba(255,255,255,.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 20%, rgba(255,255,255,.25) 0%, transparent 100%),
+      radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,.15) 0%, transparent 100%),
+      radial-gradient(1px 1px at 10% 60%, rgba(255,255,255,.2) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+
+  /* ── Header ── */
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 {
+    font-size: clamp(2rem, 6vw, 3.5rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1.1;
+    margin-bottom: 8px;
+  }
+  header p { color: var(--muted); font-size: 1rem; }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 6px;
+    margin-bottom: 28px;
+    gap: 4px;
+  }
+  .tab {
+    flex: 1; padding: 10px; border: none; border-radius: 10px;
+    background: transparent; color: var(--muted);
+    font-family: 'Heebo', sans-serif; font-size: 1rem; font-weight: 600;
+    cursor: pointer; transition: all .2s;
+  }
+  .tab.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; }
+
+  /* ── Setup Panel ── */
+  #setup-panel { display: block; }
+  #game-panel  { display: none; }
+
+  .section-title {
+    font-size: .8rem; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 14px;
+  }
+
+  /* Pairs list */
+  #pairs-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+
+  .pair-row {
+    display: grid; grid-template-columns: 1fr 1fr auto;
+    gap: 8px; align-items: center;
+    animation: slideIn .25s ease;
+  }
+  @keyframes slideIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:none; } }
+
+  .pair-row input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Heebo', sans-serif; font-size: .95rem;
+    transition: border-color .2s;
+    width: 100%;
+  }
+  .pair-row input:focus { outline: none; border-color: var(--accent); }
+  .pair-row input::placeholder { color: var(--muted); }
+
+  .del-btn {
+    width: 36px; height: 36px; border-radius: 8px; border: none;
+    background: rgba(255,100,100,.15); color: #ff6060;
+    font-size: 1.1rem; cursor: pointer; transition: background .2s;
+    flex-shrink: 0;
+  }
+  .del-btn:hover { background: rgba(255,100,100,.3); }
+
+  .col-labels {
+    display: grid; grid-template-columns: 1fr 1fr auto;
+    gap: 8px; margin-bottom: 6px;
+  }
+  .col-labels span { font-size: .78rem; color: var(--muted); padding-right: 4px; }
+
+  /* Buttons */
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn {
+    padding: 11px 22px; border-radius: 12px; border: none;
+    font-family: 'Heebo', sans-serif; font-size: .95rem; font-weight: 700;
+    cursor: pointer; transition: all .2s;
+  }
+  .btn-ghost {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; box-shadow: 0 4px 20px rgba(124,106,255,.35);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 28px rgba(124,106,255,.5); }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+  /* ── Stats bar ── */
+  #stats-bar {
+    display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 18px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: .9rem;
+  }
+  .stat-val { font-weight: 800; font-size: 1.1rem; color: var(--accent); }
+
+  /* ── Game grid ── */
+  #board {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .card {
+    position: relative;
+    min-height: 80px;
+    cursor: pointer;
+    perspective: 600px;
+  }
+  .card-inner {
+    width: 100%; height: 100%;
+    transition: transform .4s cubic-bezier(.4,0,.2,1);
+    transform-style: preserve-3d;
+    position: relative;
+    min-height: 80px;
+  }
+  .card.flipped .card-inner  { transform: rotateY(180deg); }
+  .card.matched .card-inner  { transform: rotateY(180deg); }
+
+  .card-face {
+    position: absolute; inset: 0;
+    backface-visibility: hidden;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 12px;
+    text-align: center;
+    line-height: 1.4;
+    font-size: .9rem;
+    min-height: 80px;
+  }
+  .card-back {
+    background: var(--card-back);
+    border: 1px solid var(--border);
+    font-size: 1.6rem;
+    transition: background .2s;
+  }
+  .card:hover:not(.flipped):not(.matched) .card-back {
+    background: #26265a;
+    border-color: var(--accent);
+  }
+  .card-front {
+    background: var(--card-front);
+    border: 1px solid var(--accent);
+    transform: rotateY(180deg);
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-word;
+  }
+  .card.matched .card-front {
+    background: rgba(46,204,113,.15);
+    border-color: var(--match);
+    color: var(--match);
+  }
+
+  /* shake */
+  @keyframes shake {
+    0%,100% { transform: rotateY(180deg) translateX(0); }
+    25%      { transform: rotateY(180deg) translateX(-6px); }
+    75%      { transform: rotateY(180deg) translateX(6px); }
+  }
+  .card.wrong .card-inner { animation: shake .4s ease; }
+  .card.wrong .card-front  { border-color: #ff4444; background: rgba(255,68,68,.12); }
+
+  /* ── Win overlay ── */
+  #win-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.75); backdrop-filter: blur(8px);
+    z-index: 100; align-items: center; justify-content: center;
+  }
+  #win-overlay.show { display: flex; }
+  .win-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 24px; padding: 44px 36px;
+    text-align: center; max-width: 380px; width: 90%;
+    animation: popIn .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes popIn { from { opacity:0; transform: scale(.7); } to { opacity:1; transform: scale(1); } }
+  .win-emoji { font-size: 3.5rem; margin-bottom: 12px; }
+  .win-box h2 { font-size: 2rem; font-weight: 900; margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .win-box p  { color: var(--muted); margin-bottom: 24px; font-size: 1rem; }
+  .win-stats  { display: flex; justify-content: center; gap: 28px; margin-bottom: 28px; }
+  .ws { text-align: center; }
+  .ws-val { font-size: 1.8rem; font-weight: 900; color: var(--accent); }
+  .ws-lbl { font-size: .75rem; color: var(--muted); }
+
+  /* Confetti */
+  .confetti-piece {
+    position: fixed; width: 8px; height: 8px; border-radius: 2px;
+    animation: confFall linear forwards;
+    pointer-events: none; z-index: 200;
+  }
+  @keyframes confFall {
+    0%   { transform: translateY(-10px) rotate(0deg); opacity:1; }
+    100% { transform: translateY(100vh) rotate(720deg); opacity:0; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 500px) {
+    .pair-row { grid-template-columns: 1fr 1fr auto; }
+    .pair-row input { font-size: .82rem; padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>🧠 משחק זיכרון</h1>
+    <p>הוסף שאלות ותשובות — ואז שחק!</p>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('setup')">⚙️ הגדרת זוגות</button>
+    <button class="tab" id="play-tab" onclick="startGame()">🎮 שחק!</button>
+  </div>
+
+  <!-- ── Setup ── -->
+  <div id="setup-panel">
+    <div class="section-title">זוגות שאלה ← תשובה</div>
+    <div class="col-labels">
+      <span>שאלה / מושג</span>
+      <span>תשובה / הגדרה</span>
+    </div>
+    <div id="pairs-list"></div>
+    <div class="btn-row" style="margin-bottom:28px">
+      <button class="btn btn-ghost" onclick="addPair()">＋ הוסף זוג</button>
+      <button class="btn btn-ghost" onclick="clearAll()">🗑 נקה הכל</button>
+      <button class="btn btn-primary" id="start-btn" onclick="startGame()" disabled>▶ התחל משחק</button>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;">
+      <div class="section-title">💡 טיפ</div>
+      <p style="color:var(--muted);font-size:.9rem;line-height:1.6">
+        הוסף לפחות 3 זוגות כדי להתחיל. הקלפים יוצגו באקראי — מצא כל זוג שאלה + תשובה תואמת!
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Game ── -->
+  <div id="game-panel">
+    <div id="stats-bar">
+      <div class="stat">ניסיונות: <span class="stat-val" id="s-tries">0</span></div>
+      <div class="stat">זוגות שנמצאו: <span class="stat-val" id="s-matched">0</span> / <span id="s-total">0</span></div>
+      <div class="stat">⏱ <span class="stat-val" id="s-time">0:00</span></div>
+    </div>
+    <div id="board"></div>
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="showTab('setup')">← עריכת זוגות</button>
+      <button class="btn btn-primary" onclick="restartGame()">🔄 שחק שוב</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- Win overlay -->
+<div id="win-overlay">
+  <div class="win-box">
+    <div class="win-emoji">🎉</div>
+    <h2>כל הכבוד!</h2>
+    <p>סיימת את המשחק בהצלחה</p>
+    <div class="win-stats">
+      <div class="ws"><div class="ws-val" id="w-tries">-</div><div class="ws-lbl">ניסיונות</div></div>
+      <div class="ws"><div class="ws-val" id="w-time">-</div><div class="ws-lbl">זמן</div></div>
+      <div class="ws"><div class="ws-val" id="w-score">-</div><div class="ws-lbl">ניקוד</div></div>
+    </div>
+    <div class="btn-row" style="justify-content:center">
+      <button class="btn btn-ghost" onclick="closeWin();showTab('setup')">עריכה</button>
+      <button class="btn btn-primary" onclick="closeWin();restartGame()">שחק שוב</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+let pairs = [];          // [{q, a}]
+let cards = [];          // shuffled card objects
+let flipped = [];        // indices currently face-up
+let matched = new Set();
+let tries = 0;
+let timerInt = null;
+let elapsed = 0;
+let locked = false;
+
+// ── Init ───────────────────────────────────────────────
+addPair(); addPair(); addPair();
+
+function addPair(q='', a='') {
+  pairs.push({q, a});
+  renderPairs();
+}
+
+function removePair(i) {
+  pairs.splice(i, 1);
+  renderPairs();
+}
+
+function clearAll() {
+  pairs = [];
+  addPair(); addPair(); addPair();
+}
+
+function renderPairs() {
+  const list = document.getElementById('pairs-list');
+  list.innerHTML = '';
+  pairs.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'pair-row';
+    row.innerHTML = `
+      <input type="text" placeholder="שאלה / מושג" value="${esc(p.q)}"
+             oninput="pairs[${i}].q=this.value; updateBtn()">
+      <input type="text" placeholder="תשובה / הגדרה" value="${esc(p.a)}"
+             oninput="pairs[${i}].a=this.value; updateBtn()">
+      <button class="del-btn" onclick="removePair(${i})">✕</button>
+    `;
+    list.appendChild(row);
+  });
+  updateBtn();
+}
+
+function esc(s){ return (s||'').replace(/"/g,'&quot;'); }
+
+function updateBtn() {
+  const valid = pairs.filter(p => p.q.trim() && p.a.trim()).length;
+  document.getElementById('start-btn').disabled = valid < 3;
+}
+
+// ── Tabs ───────────────────────────────────────────────
+function showTab(t) {
+  document.getElementById('setup-panel').style.display = t==='setup' ? 'block' : 'none';
+  document.getElementById('game-panel').style.display  = t==='game'  ? 'block' : 'none';
+  document.querySelectorAll('.tab').forEach((el,i)=>{
+    el.classList.toggle('active', (t==='setup'&&i===0)||(t==='game'&&i===1));
+  });
+}
+
+// ── Game ───────────────────────────────────────────────
+function startGame() {
+  const valid = pairs.filter(p => p.q.trim() && p.a.trim());
+  if (valid.length < 3) return;
+  buildBoard(valid);
+  showTab('game');
+}
+
+function buildBoard(validPairs) {
+  stopTimer();
+  tries = 0; elapsed = 0; matched = new Set(); flipped = []; locked = false;
+  document.getElementById('s-tries').textContent = '0';
+  document.getElementById('s-time').textContent  = '0:00';
+  document.getElementById('s-matched').textContent = '0';
+  document.getElementById('s-total').textContent   = validPairs.length;
+
+  // Create card objects
+  cards = [];
+  validPairs.forEach((p,i) => {
+    cards.push({ id: i, type:'q', text: p.q, pairId: i });
+    cards.push({ id: i+validPairs.length, type:'a', text: p.a, pairId: i });
+  });
+  shuffle(cards);
+
+  // Responsive columns
+  const total = cards.length;
+  const cols = total <= 8 ? 4 : total <= 12 ? 4 : total <= 16 ? 4 : 6;
+  const board = document.getElementById('board');
+  board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  board.innerHTML = '';
+
+  cards.forEach((c, idx) => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.dataset.idx = idx;
+    el.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-back">🔵</div>
+        <div class="card-face card-front">${c.text}</div>
+      </div>`;
+    el.addEventListener('click', () => flipCard(idx));
+    board.appendChild(el);
+  });
+
+  startTimer();
+}
+
+function flipCard(idx) {
+  if (locked) return;
+  if (matched.has(idx)) return;
+  if (flipped.includes(idx)) return;
+
+  const el = document.querySelector(`.card[data-idx="${idx}"]`);
+  el.classList.add('flipped');
+  flipped.push(idx);
+
+  if (flipped.length === 2) {
+    locked = true;
+    tries++;
+    document.getElementById('s-tries').textContent = tries;
+    checkMatch();
+  }
+}
+
+function checkMatch() {
+  const [a, b] = flipped;
+  const ca = cards[a], cb = cards[b];
+  const isMatch = ca.pairId === cb.pairId && ca.type !== cb.type;
+
+  setTimeout(() => {
+    const elA = document.querySelector(`.card[data-idx="${a}"]`);
+    const elB = document.querySelector(`.card[data-idx="${b}"]`);
+
+    if (isMatch) {
+      elA.classList.add('matched');
+      elB.classList.add('matched');
+      matched.add(a); matched.add(b);
+      const m = matched.size / 2;
+      document.getElementById('s-matched').textContent = m;
+      if (matched.size === cards.length) setTimeout(winGame, 300);
+    } else {
+      elA.classList.add('wrong'); elB.classList.add('wrong');
+      setTimeout(() => {
+        elA.classList.remove('flipped','wrong');
+        elB.classList.remove('flipped','wrong');
+      }, 600);
+    }
+    flipped = [];
+    locked = false;
+  }, isMatch ? 200 : 700);
+}
+
+function restartGame() {
+  const valid = pairs.filter(p => p.q.trim() && p.a.trim());
+  if (valid.length >= 3) buildBoard(valid);
+}
+
+// ── Timer ──────────────────────────────────────────────
+function startTimer() {
+  elapsed = 0;
+  timerInt = setInterval(() => {
+    elapsed++;
+    const m = Math.floor(elapsed/60), s = elapsed%60;
+    document.getElementById('s-time').textContent =
+      `${m}:${s.toString().padStart(2,'0')}`;
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInt); }
+
+// ── Win ────────────────────────────────────────────────
+function winGame() {
+  stopTimer();
+  const m = Math.floor(elapsed/60), s = elapsed%60;
+  const timeStr = `${m}:${s.toString().padStart(2,'0')}`;
+  const score = Math.max(0, Math.round(1000 - tries*20 - elapsed*2));
+  document.getElementById('w-tries').textContent = tries;
+  document.getElementById('w-time').textContent  = timeStr;
+  document.getElementById('w-score').textContent = score;
+  document.getElementById('win-overlay').classList.add('show');
+  spawnConfetti();
+}
+function closeWin() {
+  document.getElementById('win-overlay').classList.remove('show');
+}
+
+// ── Confetti ───────────────────────────────────────────
+function spawnConfetti() {
+  const colors = ['#7c6aff','#ff6ab0','#ffd166','#06d6a0','#ef476f'];
+  for (let i=0; i<60; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `
+      left:${Math.random()*100}vw;
+      top:-10px;
+      background:${colors[Math.random()*colors.length|0]};
+      animation-duration:${1.2+Math.random()*1.5}s;
+      animation-delay:${Math.random()*.6}s;
+      transform:rotate(${Math.random()*360}deg);
+    `;
+    document.body.appendChild(el);
+    el.addEventListener('animationend', ()=>el.remove());
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────
+function shuffle(arr) {
+  for (let i=arr.length-1; i>0; i--) {
+    const j = Math.random()*(i+1)|0;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+</script>
+</body>
+</html>
